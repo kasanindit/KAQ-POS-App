@@ -37,52 +37,11 @@ class _CashierScreenState extends State<CashierScreen> {
       return;
     }
 
-    final quantities = <int, int>{};
-    await showPosForm<bool>(
-      context,
-      title: product.name,
-      action: 'Tambah ke keranjang',
-      fields: StatefulBuilder(
-        builder: (context, setState) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text('Pilihan add-on per produk'),
-            const SizedBox(height: 8),
-            for (final addon in options)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(addon.name),
-                  Text('+${rupiah(addon.price)} · Stok ${addon.stock}'),
-                  QuantityStepper(
-                    name: addon.name,
-                    quantity: quantities[addon.id] ?? 0,
-                    onDecrease: (quantities[addon.id] ?? 0) == 0
-                        ? null
-                        : () => setState(
-                            () => quantities[addon.id] =
-                                quantities[addon.id]! - 1,
-                          ),
-                    onIncrease: (quantities[addon.id] ?? 0) >= addon.stock
-                        ? null
-                        : () => setState(
-                            () => quantities[addon.id] =
-                                (quantities[addon.id] ?? 0) + 1,
-                          ),
-                  ),
-                ],
-              ),
-          ],
-        ),
-      ),
-      submit: () async {
-        widget.pos.add(product, [
-          for (final addon in options)
-            if ((quantities[addon.id] ?? 0) > 0)
-              (addon: addon, quantity: quantities[addon.id]!),
-        ]);
-        return true;
-      },
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) =>
+          _OrderDialog(product: product, addons: options, pos: widget.pos),
     );
   }
 
@@ -210,6 +169,182 @@ class _CashierScreenState extends State<CashierScreen> {
       ),
     ),
   );
+}
+
+class _OrderDialog extends StatefulWidget {
+  const _OrderDialog({
+    required this.product,
+    required this.addons,
+    required this.pos,
+  });
+
+  final Product product;
+  final List<Addon> addons;
+  final PosController pos;
+
+  @override
+  State<_OrderDialog> createState() => _OrderDialogState();
+}
+
+class _OrderDialogState extends State<_OrderDialog> {
+  final _quantities = <int, int>{};
+  String? _error;
+
+  void _setQuantity(Addon addon, int quantity) => setState(() {
+    _quantities[addon.id] = quantity;
+    _error = null;
+  });
+
+  void _submit() {
+    if (ModalRoute.of(context)?.isCurrent != true) return;
+    try {
+      widget.pos.add(widget.product, [
+        for (final addon in widget.addons)
+          if ((_quantities[addon.id] ?? 0) > 0)
+            (addon: addon, quantity: _quantities[addon.id]!),
+      ]);
+      Navigator.pop(context);
+    } catch (error) {
+      setState(() => _error = posError(error));
+    }
+  }
+
+  Widget _addonRow(Addon addon, TextTheme text) {
+    final quantity = _quantities[addon.id] ?? 0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(addon.name, style: text.titleSmall),
+                Text(
+                  '+${rupiah(addon.price)} · Stok ${addon.stock}',
+                  style: text.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          QuantityStepper(
+            name: addon.name,
+            quantity: quantity,
+            onDecrease: quantity == 0
+                ? null
+                : () => _setQuantity(addon, quantity - 1),
+            onIncrease: quantity >= addon.stock
+                ? null
+                : () => _setQuantity(addon, quantity + 1),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final product = widget.product;
+    final theme = Theme.of(context);
+    final text = theme.textTheme;
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      constraints: const BoxConstraints(maxWidth: 440),
+      clipBehavior: Clip.antiAlias,
+      child: Semantics(
+        namesRoute: true,
+        label: 'Pesan ${product.name}',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AspectRatio(
+                      aspectRatio: 2,
+                      child: ProductPhoto(
+                        repository: widget.pos.repository,
+                        product: product,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(product.name, style: text.titleLarge),
+                              const SizedBox(height: 4),
+                              Text(
+                                rupiah(product.price),
+                                style: text.bodyMedium,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Stok ${product.stock}',
+                            textAlign: TextAlign.end,
+                            style: text.bodyMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 32),
+                    Text('Add-on', style: text.titleMedium),
+                    const SizedBox(height: 4),
+                    for (final addon in widget.addons) _addonRow(addon, text),
+                  ],
+                ),
+              ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_error case final message?)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+                      child: Text(
+                        message,
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                    ),
+                  OverflowBar(
+                    alignment: MainAxisAlignment.spaceBetween,
+                    overflowAlignment: OverflowBarAlignment.end,
+                    spacing: 8,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Batal'),
+                      ),
+                      FilledButton(
+                        onPressed: _submit,
+                        child: const Text('Tambah ke keranjang'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class QuantityStepper extends StatelessWidget {
