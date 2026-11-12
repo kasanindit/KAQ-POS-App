@@ -103,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text('Masuk ke Kasir'),
+                          : const Text('Masuk'),
                     ),
                   ),
                 ],

@@ -139,6 +139,8 @@ class _RegistScreenState extends State<RegistScreen> {
                     ),
                     const SizedBox(height: 12),
                   ],
+
+                  const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
@@ -163,7 +165,6 @@ class _RegistScreenState extends State<RegistScreen> {
               child: TextButton(
                 onPressed: () {
                   Get.offAllNamed(RouteName.login);
-                  ;
                 },
                 child: Text(
                   'Sudah punya akun? Login sekarang',
