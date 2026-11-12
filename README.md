@@ -17,15 +17,15 @@ Tangkapan layar berikut diambil dari tampilan aplikasi dengan data demo.
 
 | Kasir | Dialog pesanan |
 | --- | --- |
-| <img src="docs/screenshots/kasir_screen.png" alt="Katalog kasir dengan pencarian dan filter kategori" width="260"> | <img src="docs/screenshots/pesanan.png" alt="Dialog pemesanan Kopi Susu dengan pilihan add-on" width="260"> |
+| <img src="docs/screenshots/kasir_screen.jpg" alt="Katalog kasir dengan pencarian dan filter kategori" width="260"> | <img src="docs/screenshots/detail_product.jpg" alt="Dialog pemesanan Kopi Susu dengan pilihan add-on" width="260"> |
 
 | Produk | Laporan penjualan |
 | --- | --- |
-| <img src="docs/screenshots/product_screen.png" alt="Daftar produk dan pengelolaan kategori" width="260"> | <img src="docs/screenshots/laporan.png" alt="Laporan omzet dan jumlah transaksi berhasil" width="260"> |
+| <img src="docs/screenshots/product_screen.jpg" alt="Daftar produk dan pengelolaan kategori" width="260"> | <img src="docs/screenshots/laporan.png" alt="Laporan omzet dan jumlah transaksi berhasil" width="260"> |
 
 | Struk transaksi | Login |
 | --- | --- |
-| <img src="docs/screenshots/struk.png" alt="Struk yang menampilkan item, add-on, diskon, dan kembalian" width="260"> | <img src="docs/screenshots/login.png" alt="Halaman login KAQ POS" width="260"> |
+| <img src="docs/screenshots/struk_view.jpg" alt="Struk yang menampilkan item, add-on, diskon, dan kembalian" width="260"> | <img src="docs/screenshots/login.png" alt="Halaman login KAQ POS" width="260"> |
 
 ## Tech stack
 
