@@ -7,6 +7,7 @@ import 'package:pos_app/data/model/pos.dart';
 import 'package:pos_app/features/pos/widget/pos_widgets.dart';
 import 'package:pos_app/features/products/product_widgets.dart';
 import 'package:pos_app/features/shared/controller/pos_controller.dart';
+import 'package:pos_app/utils/const/color.dart';
 
 Future<bool> confirmDeleteProduct(
   BuildContext context,
@@ -314,34 +315,38 @@ class _ProductEditorScreenState extends State<ProductEditorScreen> {
                           onChanged: (value) => setState(() => _name = value),
                         ),
                         const SizedBox(height: 8),
-                        DropdownButtonFormField<int>(
-                          initialValue: _categoryId,
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Kategori produk',
-                          ),
-                          items: [
-                            for (final category in catalog.categories)
-                              DropdownMenuItem(
-                                value: category.id,
-                                child: Text(
-                                  category.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                        ButtonTheme(
+                          alignedDropdown: true,
+                          child: DropdownButtonFormField<int>(
+                            initialValue: _categoryId,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Kategori produk',
+                            ),
+                            items: [
+                              for (final category in catalog.categories)
+                                DropdownMenuItem(
+                                  value: category.id,
+                                  child: Text(
+                                    category.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                              ),
-                          ],
-                          onChanged: catalog.categories.isEmpty || _busy
-                              ? null
-                              : (id) => setState(() => _categoryId = id),
-                          validator: (id) =>
-                              id == null ? 'Pilih kategori produk.' : null,
+                            ],
+                            onChanged: catalog.categories.isEmpty || _busy
+                                ? null
+                                : (id) => setState(() => _categoryId = id),
+                            validator: (id) =>
+                                id == null ? 'Pilih kategori produk.' : null,
+                          ),
                         ),
                         if (catalog.categories.isEmpty)
-                          const Padding(
+                          Padding(
                             padding: EdgeInsets.only(top: 8),
                             child: Text(
                               'Buat kategori terlebih dahulu di menu Produk.',
+                              style: TextStyle(color: AppColors.error),
                             ),
                           ),
                         const SizedBox(height: 12),
