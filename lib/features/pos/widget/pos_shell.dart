@@ -4,10 +4,10 @@ import 'package:pos_app/data/repository/pos_repository.dart';
 import 'package:pos_app/features/login/controller/login_controller.dart';
 import 'package:pos_app/features/pos/cart_screen.dart';
 import 'package:pos_app/features/pos/cashier_screen.dart';
-import 'package:pos_app/features/shared/controller/pos_controller.dart';
 import 'package:pos_app/features/pos/widget/pos_widgets.dart';
 import 'package:pos_app/features/report/reports_screen.dart';
 import 'package:pos_app/features/products/products_screen.dart';
+import 'package:pos_app/features/shared/controller/pos_controller.dart';
 
 enum PosTab { cashier, products, reports }
 
@@ -35,6 +35,42 @@ class _PosShellState extends State<PosShell> {
   void dispose() {
     _pos.dispose();
     super.dispose();
+  }
+
+  Future<void> _showSettings(BuildContext buttonContext) async {
+    final button = buttonContext.findRenderObject();
+    final overlay = Navigator.of(buttonContext).overlay?.context
+        .findRenderObject();
+    if (button is! RenderBox ||
+        overlay is! RenderBox ||
+        !button.hasSize ||
+        !overlay.hasSize) {
+      return;
+    }
+
+    // Capture the anchor before the popup route begins layout.
+    final anchor = Rect.fromPoints(
+      button.localToGlobal(Offset.zero, ancestor: overlay),
+      button.localToGlobal(
+        button.size.bottomRight(Offset.zero),
+        ancestor: overlay,
+      ),
+    );
+    final editShop = await showMenu<bool>(
+      context: buttonContext,
+      position: RelativeRect.fromRect(anchor, Offset.zero & overlay.size),
+      items: const [
+        PopupMenuItem(value: true, child: Text('Detail toko')),
+        PopupMenuItem(value: false, child: Text('Keluar')),
+      ],
+    );
+    if (!mounted || editShop == null) return;
+
+    if (editShop) {
+      await _editShop();
+    } else {
+      await _auth.logout();
+    }
   }
 
   Future<void> _editShop() async {
@@ -92,21 +128,6 @@ class _PosShellState extends State<PosShell> {
               ),
             ),
             actions: [
-              PopupMenuButton<bool>(
-                tooltip: 'Pengaturan',
-                enabled: !authLoading,
-                onSelected: (shop) {
-                  if (shop) {
-                    _editShop();
-                  } else {
-                    _auth.logout();
-                  }
-                },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: true, child: Text('Detail toko')),
-                  PopupMenuItem(value: false, child: Text('Keluar')),
-                ],
-              ),
               if (_tab == PosTab.cashier)
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -127,6 +148,15 @@ class _PosShellState extends State<PosShell> {
                     ),
                   ),
                 ),
+              Builder(
+                builder: (buttonContext) => IconButton(
+                  tooltip: 'Pengaturan',
+                  onPressed: authLoading
+                      ? null
+                      : () => _showSettings(buttonContext),
+                  icon: const Icon(Icons.more_vert),
+                ),
+              ),
             ],
           ),
           body: SafeArea(
