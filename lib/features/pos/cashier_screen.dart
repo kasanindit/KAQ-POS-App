@@ -24,11 +24,23 @@ class _CashierScreenState extends State<CashierScreen> {
     _categoryId = widget.pos.catalog.availableCategory(_categoryId);
   }
 
+  void _showAddedToCart(Product product) {
+    ScaffoldMessenger.of(context)
+      ..removeCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('${product.name} ditambahkan ke keranjang'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+  }
+
   Future<void> _add(Product product) async {
     final options = widget.pos.catalog.addonsFor(product.id);
     if (options.isEmpty) {
       try {
         widget.pos.add(product, []);
+        _showAddedToCart(product);
       } on PosException catch (error) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
@@ -37,12 +49,15 @@ class _CashierScreenState extends State<CashierScreen> {
       return;
     }
 
-    await showDialog<void>(
+    final added = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (context) =>
+      builder: (_) =>
           _OrderDialog(product: product, addons: options, pos: widget.pos),
     );
+    if (added == true && mounted) {
+      _showAddedToCart(product);
+    }
   }
 
   @override
@@ -67,7 +82,7 @@ class _CashierScreenState extends State<CashierScreen> {
                   children: [
                     const PosHeading('Kasir'),
                     const SizedBox(height: 4),
-                    Text('Kasir: ${widget.cashier}'),
+                    Text('Nama Kasir: ${widget.cashier}'),
                     const SizedBox(height: 16),
                     TextField(
                       decoration: const InputDecoration(
@@ -203,10 +218,11 @@ class _OrderDialogState extends State<_OrderDialog> {
           if ((_quantities[addon.id] ?? 0) > 0)
             (addon: addon, quantity: _quantities[addon.id]!),
       ]);
-      Navigator.pop(context);
     } catch (error) {
       setState(() => _error = posError(error));
+      return;
     }
+    Navigator.pop<bool>(context, true);
   }
 
   Widget _addonRow(Addon addon, TextTheme text) {
@@ -300,7 +316,7 @@ class _OrderDialogState extends State<_OrderDialog> {
                         ),
                       ],
                     ),
-                    const Divider(height: 32),
+                    const Divider(height: 16),
                     Text('Add-on', style: text.titleMedium),
                     const SizedBox(height: 4),
                     for (final addon in widget.addons) _addonRow(addon, text),
@@ -308,7 +324,6 @@ class _OrderDialogState extends State<_OrderDialog> {
                 ),
               ),
             ),
-            const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Column(
@@ -325,7 +340,7 @@ class _OrderDialogState extends State<_OrderDialog> {
                   OverflowBar(
                     alignment: MainAxisAlignment.spaceBetween,
                     overflowAlignment: OverflowBarAlignment.end,
-                    spacing: 8,
+                    spacing: 4,
                     children: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),

@@ -92,7 +92,7 @@ class CartScreen extends StatelessWidget {
                                 line.quantity + 1,
                               ),
                             ),
-                            PosAmountRow('Jumlah item', line.total),
+                            PosAmountRow('Harga item', line.total),
                           ],
                         ),
                       ),

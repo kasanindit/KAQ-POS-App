@@ -81,7 +81,7 @@ class CartLine {
 
   for (final line in lines) {
     if (line.quantity < 1 || line.addons.any((item) => item.quantity < 1)) {
-      throw const PosException('Jumlah item harus lebih dari nol.');
+      throw const PosException(' harus lebih dari nol.');
     }
     final product = products[line.product.id];
     if (product == null ||

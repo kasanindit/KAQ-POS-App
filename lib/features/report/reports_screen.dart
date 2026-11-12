@@ -46,7 +46,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Total omzet'),
+                const Text('Total revenue'),
                 Text(
                   rupiah(revenue),
                   style: Theme.of(context).textTheme.headlineSmall,
@@ -166,7 +166,7 @@ class ReceiptScreen extends StatelessWidget {
                         Text(
                           '+ ${addon.name} · ${addon.quantity} × ${rupiah(addon.price)} per produk',
                         ),
-                      PosAmountRow('Jumlah item', item.total),
+                      PosAmountRow('Harga item', item.total),
                       const SizedBox(height: 8),
                     ],
                     const Divider(height: 24),
