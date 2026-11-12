@@ -87,6 +87,7 @@ Future<T?> showPosForm<T>(
   required Widget fields,
   required Future<T> Function() submit,
   String action = 'Simpan',
+  ShapeBorder? shape,
 }) {
   final formKey = GlobalKey<FormState>();
   bool busy = false;
@@ -98,6 +99,7 @@ Future<T?> showPosForm<T>(
       builder: (context, setState) => PopScope(
         canPop: !busy,
         child: AlertDialog(
+          shape: shape,
           title: Text(title),
           scrollable: true,
           content: Form(

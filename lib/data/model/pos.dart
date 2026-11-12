@@ -1,16 +1,42 @@
 import 'package:flutter/foundation.dart';
 
-typedef Product = ({int id, String name, int price, int stock});
+typedef Product = ({
+  int id,
+  String name,
+  int price,
+  int stock,
+  int? categoryId,
+  int? photoVersion,
+});
 typedef Addon = ({int id, String name, int price, int stock});
+typedef Category = ({int id, String name});
+typedef PhotoChange = ({Uint8List? bytes});
 typedef CartAddon = ({Addon addon, int quantity});
 typedef Shop = ({String name, String address});
 
 class Catalog {
-  const Catalog(this.products, this.addons, this.links);
+  const Catalog(
+    this.products,
+    this.addons,
+    this.links, {
+    this.categories = const [],
+  });
 
   final List<Product> products;
   final List<Addon> addons;
   final Map<int, Set<int>> links;
+  final List<Category> categories;
+
+  Iterable<Product> productsIn(int? categoryId) => categoryId == null
+      ? products
+      : products.where((product) => (product.categoryId ?? 0) == categoryId);
+
+  int? availableCategory(int? id) {
+    if (id == 0 && products.any((product) => product.categoryId == null)) {
+      return 0;
+    }
+    return categories.any((category) => category.id == id) ? id : null;
+  }
 
   List<Addon> addonsFor(int productId) {
     final ids = links[productId];

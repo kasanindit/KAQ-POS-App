@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:pos_app/data/database/app_database.dart';
 import 'package:pos_app/data/model/auth.dart';
@@ -16,8 +17,20 @@ class PosRepository {
   }
 
   Future<Catalog> _readCatalog(DatabaseExecutor db) async {
-    final products = await _readMaster(db, 'products');
-    final addons = await _readMaster(db, 'addons');
+    final products = await db.rawQuery('''
+      SELECT p.*, f.revision AS photo_version
+      FROM products p LEFT JOIN product_photos f ON f.product_id = p.id
+      WHERE p.is_active = 1 ORDER BY p.name COLLATE NOCASE, p.id
+    ''');
+    final addons = await db.query(
+      'addons',
+      where: 'is_active = 1',
+      orderBy: 'name COLLATE NOCASE, id',
+    );
+    final categories = await db.query(
+      'categories',
+      orderBy: 'name COLLATE NOCASE, id',
+    );
     final rows = await db.query('product_addons');
     final links = <int, Set<int>>{};
     for (final row in rows) {
@@ -25,75 +38,181 @@ class PosRepository {
           .putIfAbsent(row['product_id'] as int, () => <int>{})
           .add(row['addon_id'] as int);
     }
-    return Catalog(products, addons, links);
-  }
-
-  Future<List<Product>> _readMaster(DatabaseExecutor db, String table) async {
-    final rows = await db.query(
-      table,
-      where: 'is_active = 1',
-      orderBy: 'name COLLATE NOCASE, id',
+    return Catalog(
+      [
+        for (final row in products)
+          (
+            id: row['id'] as int,
+            name: row['name'] as String,
+            price: row['price'] as int,
+            stock: row['stock'] as int,
+            categoryId: row['category_id'] as int?,
+            photoVersion: row['photo_version'] as int?,
+          ),
+      ],
+      [
+        for (final row in addons)
+          (
+            id: row['id'] as int,
+            name: row['name'] as String,
+            price: row['price'] as int,
+            stock: row['stock'] as int,
+          ),
+      ],
+      links,
+      categories: [
+        for (final row in categories)
+          (id: row['id'] as int, name: row['name'] as String),
+      ],
     );
-    return [
-      for (final row in rows)
-        (
-          id: row['id'] as int,
-          name: row['name'] as String,
-          price: row['price'] as int,
-          stock: row['stock'] as int,
-        ),
-    ];
   }
 
-  Future<void> saveProduct(Product product, Set<int> addonIds) async {
+  Future<void> saveProduct(
+    Product product,
+    List<Addon> addons, {
+    PhotoChange? photo,
+  }) async {
+    if (product.categoryId == null) {
+      throw const PosException('Pilih kategori produk.');
+    }
     final db = await _database.database;
     await db.transaction((txn) async {
-      final id = await _saveMaster(txn, 'products', product);
+      final id = await _saveMaster(txn, 'products', product.id, {
+        'name': product.name,
+        'price': product.price,
+        'stock': product.stock,
+        'category_id': product.categoryId,
+      });
+      final previousAddons = await _linkedAddons(txn, id);
       await txn.delete(
         'product_addons',
         where: 'product_id = ?',
         whereArgs: [id],
       );
-      for (final addonId in addonIds) {
+      for (final addon in addons) {
+        final addonId = await _saveMaster(txn, 'addons', addon.id, {
+          'name': addon.name,
+          'price': addon.price,
+          'stock': addon.stock,
+        });
         await txn.insert('product_addons', {
           'product_id': id,
           'addon_id': addonId,
         });
       }
+      await _deleteUnusedAddons(txn, previousAddons);
+      if (photo != null) await _savePhoto(txn, id, photo.bytes);
     });
   }
 
-  Future<void> saveAddon(Addon addon) async {
-    await _saveMaster(await _database.database, 'addons', addon);
+  Future<Uint8List?> productPhoto(int id) async {
+    final db = await _database.database;
+    final rows = await db.query(
+      'product_photos',
+      columns: ['bytes'],
+      where: 'product_id = ?',
+      whereArgs: [id],
+    );
+    return rows.firstOrNull?['bytes'] as Uint8List?;
+  }
+
+  Future<void> _savePhoto(Transaction txn, int id, Uint8List? bytes) async {
+    if (bytes == null) {
+      await txn.delete(
+        'product_photos',
+        where: 'product_id = ?',
+        whereArgs: [id],
+      );
+      return;
+    }
+    final updated = await txn.rawUpdate(
+      'UPDATE product_photos SET bytes = ?, revision = revision + 1 WHERE product_id = ?',
+      [bytes, id],
+    );
+    if (updated == 0) {
+      await txn.insert('product_photos', {'product_id': id, 'bytes': bytes});
+    }
   }
 
   Future<int> _saveMaster(
     DatabaseExecutor db,
     String table,
-    Product item,
+    int id,
+    Map<String, Object?> values,
   ) async {
-    final values = {
-      'name': item.name,
-      'price': item.price,
-      'stock': item.stock,
-    };
-    if (item.id == 0) return db.insert(table, values);
+    if (id == 0) return db.insert(table, values);
     final updated = await db.update(
       table,
       values,
       where: 'id = ? AND is_active = 1',
-      whereArgs: [item.id],
+      whereArgs: [id],
     );
     if (updated == 0) throw const PosException('Data sudah dihapus.');
-    return item.id;
+    return id;
   }
 
-  Future<void> archiveProduct(int id) => _archive('products', id);
-  Future<void> archiveAddon(int id) => _archive('addons', id);
-
-  Future<void> _archive(String table, int id) async {
+  Future<void> deleteProduct(int id) async {
     final db = await _database.database;
-    await db.update(table, {'is_active': 0}, where: 'id = ?', whereArgs: [id]);
+    await db.transaction((txn) async {
+      final addonIds = await _linkedAddons(txn, id);
+      await txn.delete(
+        'product_addons',
+        where: 'product_id = ?',
+        whereArgs: [id],
+      );
+      await txn.delete('products', where: 'id = ?', whereArgs: [id]);
+      await _deleteUnusedAddons(txn, addonIds);
+    });
+  }
+
+  Future<Iterable<int>> _linkedAddons(Transaction txn, int id) async {
+    final rows = await txn.query(
+      'product_addons',
+      columns: ['addon_id'],
+      where: 'product_id = ?',
+      whereArgs: [id],
+    );
+    return rows.map((row) => row['addon_id'] as int);
+  }
+
+  Future<void> _deleteUnusedAddons(Transaction txn, Iterable<int> ids) async {
+    for (final id in ids) {
+      await txn.rawDelete(
+        '''
+        DELETE FROM addons WHERE id = ?
+        AND NOT EXISTS (SELECT 1 FROM product_addons WHERE addon_id = addons.id)
+      ''',
+        [id],
+      );
+    }
+  }
+
+  Future<void> saveCategory(Category category) async {
+    final db = await _database.database;
+    final values = {'name': category.name.trim()};
+    try {
+      if (category.id == 0) {
+        await db.insert('categories', values);
+      } else {
+        final updated = await db.update(
+          'categories',
+          values,
+          where: 'id = ?',
+          whereArgs: [category.id],
+        );
+        if (updated == 0) throw const PosException('Kategori sudah dihapus.');
+      }
+    } on DatabaseException catch (error) {
+      if (error.isUniqueConstraintError()) {
+        throw const PosException('Nama kategori sudah digunakan.');
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> deleteCategory(int id) async {
+    final db = await _database.database;
+    await db.delete('categories', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<Shop> shop() async => _readShop(await _database.database);

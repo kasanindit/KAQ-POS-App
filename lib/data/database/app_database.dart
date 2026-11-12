@@ -18,7 +18,7 @@ class AppDatabase {
 
     return openDatabase(
       databasePath,
-      version: 2,
+      version: 3,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -53,9 +53,11 @@ class AppDatabase {
         ''');
 
         await _createPosTables(db);
+        await _createProductDetails(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createPosTables(db);
+        if (oldVersion < 3) await _createProductDetails(db);
       },
     );
   }
@@ -100,6 +102,29 @@ class AppDatabase {
         total INTEGER NOT NULL CHECK (total = subtotal - discount),
         cash INTEGER NOT NULL CHECK (cash >= total),
         change_due INTEGER NOT NULL CHECK (change_due = cash - total)
+      )
+    ''');
+  }
+
+  Future<void> _createProductDetails(Database db) async {
+    await db.execute('''
+      CREATE TABLE categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL COLLATE NOCASE UNIQUE
+      )
+    ''');
+    await db.execute('''
+      ALTER TABLE products
+        ADD COLUMN category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL
+    ''');
+    await db.execute(
+      'CREATE INDEX idx_products_category ON products(category_id)',
+    );
+    await db.execute('''
+      CREATE TABLE product_photos (
+        product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
+        revision INTEGER NOT NULL DEFAULT 1,
+        bytes BLOB NOT NULL
       )
     ''');
   }

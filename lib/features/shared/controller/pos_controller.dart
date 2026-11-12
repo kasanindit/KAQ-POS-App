@@ -64,6 +64,12 @@ class PosController extends ChangeNotifier {
     _notify();
   }
 
+  Future<void> deleteProduct(int id) async {
+    await repository.deleteProduct(id);
+    _cart.removeWhere((line) => line.product.id == id);
+    await load();
+  }
+
   Future<Sale?> checkout(AuthUser cashier, PaymentInput input) async {
     if (paying) return null;
     paying = true;
